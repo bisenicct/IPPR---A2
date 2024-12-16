@@ -16,45 +16,26 @@ def expectation_maximization(
     alphas = np.full((K,), 1. / K)
     mus = X[:K]
     sigmas = np.tile(np.eye(m)[None], (K, 1, 1))
-
     
-    def pdf(x,mu_,sig_,alpha_):
-        d = x.shape[-1]
-        sigma_offset = sig_ #+ 1e-6 * np.eye(d)
-        L = np.linalg.inv(np.linalg.inv(sigma_offset)) ####??????????
-        sigma_det = 2 * np.sum(np.log(np.diag(L)))  
-        fact = -0.5 * (d * np.log(2 * np.pi) + sigma_det)#log sigma det
-        diff = x - mu_[None, :]
-        inv_sig = np.linalg.inv(sigma_offset)
-        tmp = np.einsum('ij,Nj->Ni',inv_sig,diff)
-        tmp = np.einsum('Ni,Ni->N',diff,tmp)
-        log_prob = fact + (-0.5) * tmp + np.log(alpha_)
-        return log_prob
-    
-    def beta(x,mu_,sig_,alpha_):
-        m = x.shape[1]
-        L = np.linalg.inv(np.linalg.cholesky(sig_))
-        #L = np.linalg.cholesky(np.linalg.inv(sig_))
+    def beta(x, mu_, sig_, alpha_):
+        L = np.linalg.cholesky(np.linalg.inv(sig_))
         sign, log_det = np.linalg.slogdet(L)
+        
         diff = x - mu_[None, :]
-        #norm = (L @ diff.T).T
-        norm = diff @ L.T
+        norm = diff @ L
         sq_norm = np.sum(norm**2,axis=1)
-        beta = -0.5*(sq_norm+m*np.log(2*np.pi)) + sign*log_det + np.log(alpha_)
+
+        
+        beta = -0.5 * ( sq_norm + m * np.log(2*np.pi) ) + sign * log_det + np.log(alpha_)
         
         return beta
 
     for it in range(max_iter):
-        print(it)
         # TODO: Implement (9) - (11)
-        alphas = alphas
-        mus = mus
-        sigmas = sigmas
-    
+
         llh = np.zeros((K,N)) 
         for k in range(K):
-            #llh[k] = pdf(X,mus[k],sigmas[k],alphas[k])
-            llh[k] = beta(X,mus[k],sigmas[k],alphas[k])
+            llh[k] = beta(X, mus[k], sigmas[k], alphas[k])
     
         #ok - LogSumExp
         max_llh = np.max(llh, axis=0)
@@ -63,26 +44,57 @@ def expectation_maximization(
         sum_exp_diff_llh = np.sum(exp_diff_llh, axis=0)
         log_sum_exp_diff_llh = max_llh + np.log(sum_exp_diff_llh)
         
-        #llh_all.append(-np.sum(log_sum_exp_diff_llh))#?
-
         #gama
         log_wk = llh-log_sum_exp_diff_llh
         wk = np.exp(log_wk)
+
         # Compute Nk - sum of gamas
         Nk = np.sum(wk, axis=1)
+        
         # recompute params
-        mus = (wk[...,None]*X[None,...]).sum(1)/Nk[:,None] #KxM*M
-        diff = (X[None,...] - mus[:,None,:]) #KxNxM*M
-        sigmas = np.einsum('KNi,KNj->Kij',wk[:,:,None]*diff,diff)/Nk[:,None,None] #KxM*MxM*M
-        alphas = Nk/N 
-        sigmas = sigmas + epsilon*np.eye(m)
-        # if it >= 2 and np.abs(llh_all[-2] - llh_all[-1]) <= epsilon:
-        #     print('EM algo. terminated in iter %i' %it)
-        if it == max_iter - 1 and plot:
+        alphas = Nk / N
+
+        mus = ( wk[...,None] * X[None,...] ).sum(1) / Nk[:,None]                                # K x M*M
+        
+        diff = (X[None,...] - mus[:,None,:])                                                   # K x N x M*M
+        sigmas = np.einsum( 'KNi, KNj -> Kij', wk[:,:,None] * diff, diff) / Nk[:,None,None]   # K x M*M x M*M 
+        sigmas = sigmas + epsilon * np.eye(m) 
+
+        if it % show_each == 0 and plot:
+            print(it)
+
+        if it  == max_iter - 1 and plot:
             utils.plot_gmm(X, alphas, mus, sigmas)
 
-        # if it % show_each == 0 and plot:
-        #     utils.plot_gmm(X, alphas, mus, sigmas)
+
+
+    #
+    # Caluclates the probability under the fitted models. 
+    #
+    print("Our alpha: ", alphas)
+    our = np.zeros((K,N)) 
+    for k in range(K):
+        our[k] = beta(X, mus[k], sigmas[k], alphas[k])
+
+    max_our = np.max(our, axis=0)
+    diff_our = our - max_our
+    exp_diff_our = np.exp(diff_our)
+    sum_exp_diff_our = np.sum(exp_diff_our, axis=0)
+    log_sum_exp_diff_our = max_our + np.log(sum_exp_diff_our)
+
+    prof_alphas = np.array([0.2, 0.8]) # taken from utils
+    print("Prof alpha: ", prof_alphas) 
+    prof = np.zeros((K,N)) 
+    for k in range(K):
+        prof[k] = beta(X, utils._mus[k], utils._sigmas[k], prof_alphas[k])
+
+    max_prof = np.max(prof, axis=0)
+    diff_prof = prof - max_prof
+    exp_diff_prof = np.exp(diff_prof)
+    sum_exp_diff_prof = np.sum(exp_diff_prof, axis=0)
+    log_sum_exp_diff_prof = max_prof + np.log(sum_exp_diff_prof)
+
+    print(np.exp(log_sum_exp_diff_our) - np.exp(log_sum_exp_diff_prof))
 
     return alphas, mus, sigmas
 
@@ -111,25 +123,26 @@ def denoise(
     lamda = 1 / sigma ** 2
     E = np.eye(m) - np.full((m, m), 1 / m)
 
-    def beta(x,mu_,sig_,alpha_):
-        m = x.shape[1]
-        L = np.linalg.inv(np.linalg.cholesky(sig_))
-        #L = np.linalg.cholesky(np.linalg.inv(sig_))
+    def beta(x, mu_, sig_, alpha_):
+        L = np.linalg.cholesky(np.linalg.inv(sig_))
         sign, log_det = np.linalg.slogdet(L)
+        
         diff = x - mu_[None, :]
-        #norm = (L @ diff.T).T
-        norm = diff @ L.T
+        norm = diff @ L
         sq_norm = np.sum(norm**2,axis=1)
-        beta = -0.5*(sq_norm+m*np.log(2*np.pi)) + sign*log_det + np.log(alpha_)
+
+        
+        beta = -0.5 * ( sq_norm + m * np.log(2*np.pi) ) + sign * log_det + np.log(alpha_)
         
         return beta
+    
     # TODO: Precompute A, b (26)
     
     A = np.zeros((K,m,m))
     b = np.zeros((K,m))
 
-    A = np.linalg.inv(lamda*np.eye(m) + E.T[None,:]@(np.linalg.inv(sigmas))@E[None,:])
-    b = np.linalg.inv(sigmas)@E[None,:] @ mus[:,:,None]
+    A = np.linalg.inv(lamda*np.eye(m) + E.T[None,:] @ (np.linalg.inv(sigmas)) @ E[None,:])
+    b = np.linalg.inv(sigmas) @ E[None,:] @ mus[:,:,None]
     b = b.squeeze(-1)
     
     tmp = lamda*y
@@ -140,12 +153,13 @@ def denoise(
         
         betas=np.zeros((K))
         for k in range(K):
-            betas[k] = np.sum(beta(x_est@E,mus[k],sigmas[k],alphas[k]),axis=0)
+            betas[k] = np.sum(beta(x_est @ E , mus[k], sigmas[k], alphas[k]) , axis=0)
         
+
         k_max = np.argmax(betas)
         x_tilde = A[k_max][None,:]
 
-        x_tilde =(x_tilde@(tmp+b[k_max][None,:])[:,:,None]).squeeze(-1)
+        x_tilde =(x_tilde @ ( tmp + b[k_max][None,:])[:,:,None]).squeeze(-1)
 
         x_est = alpha * x_est + (1 - alpha) * x_tilde
 
@@ -176,14 +190,15 @@ if __name__ == "__main__":
     use_toy_data = True
     # Parameters for the GMM: Components and window size, m = w ** 2
     # Use K = 2 for toy/debug model
-    K = 2
+    K = 10
     w = 5
     if do_training:
         train(use_toy_data, K, w)
     else:
         for i in range(1, 6):
-            denoise(i, K, w, test=False)
+            denoised = denoise(i, K, w, test=False)
+            utils.imsave(f'./validation/img{i}_out_my.png', denoised)
 
     # If you want to participate in the challenge, you can benchmark your model
     # Remember to upload the images in the submission.
-    benchmark(K, w)
+    # benchmark(K, w)

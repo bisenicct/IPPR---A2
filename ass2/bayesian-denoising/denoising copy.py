@@ -183,8 +183,8 @@ def denoise(
     A = np.zeros((K,m,m))
     b = np.zeros((K,m))
 
-    A = np.linalg.inv(lamda*np.eye(m) + E.T[None,:]@(np.linalg.inv(sigmas))@E[None,:])
-    b = np.linalg.inv(sigmas)@E[None,:] @ mus[:,:,None]
+    A = np.linalg.inv(lamda * np.eye(m) + E.T[None,:] @ (np.linalg.inv(sigmas) ) @ E[None,:] )
+    b = np.linalg.inv(sigmas) @ E[None,:] @ mus[:,:,None]
     b = b.squeeze(-1)
     
     tmp = lamda*y
@@ -196,7 +196,7 @@ def denoise(
 
         betas=np.zeros((K))
         for k in range(K):
-            betas[k] = np.sum(beta(x_est@E,mus[k],sigmas[k],alphas[k]),axis=0)
+            betas[k] = np.sum( beta( x_est @ E, mus[k], sigmas[k], alphas[k]), axis=0)
         
         k_max = np.argmax(betas)
         x_tilde = A[k_max][None,:]
@@ -238,7 +238,9 @@ if __name__ == "__main__":
         train(use_toy_data, K, w)
     else:
         for i in range(1, 6):
-            denoise(i, K, w, test=False)
+            denoised = denoise(i, K, w, test=False)
+            utils.imsave(f'/validation/img{i}_out_my.png', denoised)
+
 
     # If you want to participate in the challenge, you can benchmark your model
     # Remember to upload the images in the submission.
