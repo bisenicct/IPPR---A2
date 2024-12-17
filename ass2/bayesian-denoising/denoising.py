@@ -171,7 +171,7 @@ def denoise(
 
 def benchmark(K: int = 10, w: int = 5):
     for i in range(1, 5):
-        utils.imsave(f'./test/img{i}_out_my.png', denoise(i, K, w, test=True))
+        utils.imsave(f'./test/img{i}_out_ref.png', denoise(i, K, w, test=True))
 
 
 def train(use_toy_data: bool = True, K: int = 2, w: int = 5):
@@ -186,18 +186,20 @@ def train(use_toy_data: bool = True, K: int = 2, w: int = 5):
 if __name__ == "__main__":
     do_training = False
     # Use the toy data to debug your EM implementation
-    use_toy_data = True
+    use_toy_data = False
     # Parameters for the GMM: Components and window size, m = w ** 2
     # Use K = 2 for toy/debug model
     K = 10
     w = 5
-    if do_training:
-        train(use_toy_data, K, w)
-    else:
-        for i in range(1, 6):
-            denoised = denoise(i, K, w, test=False)
-            utils.imsave(f'./validation/img{i}_out_my.png', denoised)
+    benchmark(K, w)
+    
+    # if do_training:
+    #     train(use_toy_data, K, w)
+    # else:
+    #     for i in range(1, 6):
+    #         denoised = denoise(i, K, w, test=False)
+    #         utils.imsave(f'./validation/img{i}_out.png', denoised)
 
     # If you want to participate in the challenge, you can benchmark your model
     # Remember to upload the images in the submission.
-    # benchmark(K, w)
+    #benchmark(K, w)
