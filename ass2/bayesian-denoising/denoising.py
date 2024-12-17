@@ -151,15 +151,14 @@ def denoise(
     for it in range(max_iter):
         # TODO: Implement Line 3, Line 4 of Algorithm 1
         
-        betas=np.zeros((K))
+        betas=np.zeros((K, N))
         for k in range(K):
-            betas[k] = np.sum(beta(x_est @ E , mus[k], sigmas[k], alphas[k]) , axis=0)
+            betas[k] = beta(x_est @ E , mus[k], sigmas[k], alphas[k])
         
+        k_max = np.argmax(betas, axis =0)
+        x_tilde = A[k_max]
 
-        k_max = np.argmax(betas)
-        x_tilde = A[k_max][None,:]
-
-        x_tilde =(x_tilde @ ( tmp + b[k_max][None,:])[:,:,None]).squeeze(-1)
+        x_tilde =(x_tilde @ ( tmp + b[k_max])[:,:,None]).squeeze(-1)
 
         x_est = alpha * x_est + (1 - alpha) * x_tilde
 
