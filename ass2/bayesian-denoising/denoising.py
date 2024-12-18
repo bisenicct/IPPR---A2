@@ -1,6 +1,6 @@
 import numpy as np
 import utils
-
+import matplotlib.pyplot as plt
 
 def expectation_maximization(
     X: np.ndarray,
@@ -171,7 +171,7 @@ def denoise(
 
 def benchmark(K: int = 10, w: int = 5):
     for i in range(1, 5):
-        utils.imsave(f'./test/img{i}_out_ref.png', denoise(i, K, w, test=True))
+        utils.imsave(f'./test/img{i}_out.png', denoise(i, K, w, test=True))
 
 
 def train(use_toy_data: bool = True, K: int = 2, w: int = 5):
@@ -191,15 +191,29 @@ if __name__ == "__main__":
     # Use K = 2 for toy/debug model
     K = 10
     w = 5
-    benchmark(K, w)
     
-    # if do_training:
-    #     train(use_toy_data, K, w)
-    # else:
-    #     for i in range(1, 6):
-    #         denoised = denoise(i, K, w, test=False)
-    #         utils.imsave(f'./validation/img{i}_out.png', denoised)
+    if do_training:
+        train(use_toy_data, K, w)
+    else:
+        # fig, axes = plt.subplots(5, 3, figsize=(10, 15))  # 5 rows, 3 columns
+        # axes[0, 0].set_title('Noisy')
+        # axes[0, 1].set_title('Denoised')
+        # axes[0, 2].set_title('Ground Truth')
+        for i in range(1, 6):
+            denoised = denoise(i, K, w, test=False,sigma=0.05)
+            # x, y = utils.validation_data(i, sigma=0.1, seed=1, w=w)
+            # noisy = utils.patches_to_image(y, x.shape, w)
+            # axes[i-1,0].imshow(noisy,cmap='gray')
+            # axes[i-1,1].imshow(denoised,cmap='gray')
+            # axes[i-1,2].imshow(x,cmap='gray')
 
+            utils.imsave(f'./validation/img{i}_out_005.png', denoised)
+        # for ax_row in axes:
+        #     for ax in ax_row:
+        #         ax.axis('off')
+        # plt.tight_layout()
+        # plt.savefig("validation_0.1.png")
+        
     # If you want to participate in the challenge, you can benchmark your model
     # Remember to upload the images in the submission.
     #benchmark(K, w)
