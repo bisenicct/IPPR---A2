@@ -84,8 +84,7 @@ _param_names = ['alphas', 'mus', 'sigmas']
 
 
 def _get_model_path(K: int, w: int):
-    return os.path.join('models', f'K_{K:02d}_w_{w:02d}')
-    #return os.path.join('models_ref', f'K_{K:02d}_w_{w:02d}')   
+    return os.path.join('models', f'K_{K:02d}_w_{w:02d}') 
 
 
 def save_gmm(

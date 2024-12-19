@@ -1,6 +1,7 @@
 import numpy as np
 import utils
 import matplotlib.pyplot as plt
+import imageio
 
 def expectation_maximization(
     X: np.ndarray,
@@ -71,30 +72,30 @@ def expectation_maximization(
     #
     # Caluclates the probability under the fitted models. 
     #
-    print("Our alpha: ", alphas)
-    our = np.zeros((K,N)) 
-    for k in range(K):
-        our[k] = beta(X, mus[k], sigmas[k], alphas[k])
+    # print("Our alpha: ", alphas)
+    # our = np.zeros((K,N)) 
+    # for k in range(K):
+    #     our[k] = beta(X, mus[k], sigmas[k], alphas[k])
 
-    max_our = np.max(our, axis=0)
-    diff_our = our - max_our
-    exp_diff_our = np.exp(diff_our)
-    sum_exp_diff_our = np.sum(exp_diff_our, axis=0)
-    log_sum_exp_diff_our = max_our + np.log(sum_exp_diff_our)
+    # max_our = np.max(our, axis=0)
+    # diff_our = our - max_our
+    # exp_diff_our = np.exp(diff_our)
+    # sum_exp_diff_our = np.sum(exp_diff_our, axis=0)
+    # log_sum_exp_diff_our = max_our + np.log(sum_exp_diff_our)
 
-    prof_alphas = np.array([0.2, 0.8]) # taken from utils
-    print("Prof alpha: ", prof_alphas) 
-    prof = np.zeros((K,N)) 
-    for k in range(K):
-        prof[k] = beta(X, utils._mus[k], utils._sigmas[k], prof_alphas[k])
+    # prof_alphas = np.array([0.2, 0.8]) # taken from utils
+    # print("Prof alpha: ", prof_alphas) 
+    # prof = np.zeros((K,N)) 
+    # for k in range(K):
+    #     prof[k] = beta(X, utils._mus[k], utils._sigmas[k], prof_alphas[k])
 
-    max_prof = np.max(prof, axis=0)
-    diff_prof = prof - max_prof
-    exp_diff_prof = np.exp(diff_prof)
-    sum_exp_diff_prof = np.sum(exp_diff_prof, axis=0)
-    log_sum_exp_diff_prof = max_prof + np.log(sum_exp_diff_prof)
+    # max_prof = np.max(prof, axis=0)
+    # diff_prof = prof - max_prof
+    # exp_diff_prof = np.exp(diff_prof)
+    # sum_exp_diff_prof = np.sum(exp_diff_prof, axis=0)
+    # log_sum_exp_diff_prof = max_prof + np.log(sum_exp_diff_prof)
 
-    print(np.exp(log_sum_exp_diff_our) - np.exp(log_sum_exp_diff_prof))
+    # print(np.exp(log_sum_exp_diff_our) - np.exp(log_sum_exp_diff_prof))
 
     return alphas, mus, sigmas
 
@@ -162,7 +163,7 @@ def denoise(
 
         x_est = alpha * x_est + (1 - alpha) * x_tilde
 
-        if not test:
+        if not test and it == max_iter-1:
             u = utils.patches_to_image(x_est, x.shape, w)
             print(f"it: {it+1:03d}, psnr(u, y)={utils.psnr(u, x):.2f}")
 
@@ -182,6 +183,21 @@ def train(use_toy_data: bool = True, K: int = 2, w: int = 5):
     if not use_toy_data:
         utils.save_gmm(K, w, alphas, mus, sigmas)
 
+def models_test():
+    k = [2,5,10,10,10,15]
+    w = [5,5,3,5,7,5]
+    num = len(k)
+    fig, axes = plt.subplots(2, 3, figsize=(16,12)) 
+    axes = axes.flatten()
+    for i in range(num):
+        denoised = denoise(1, k[i], w[i], test=False,sigma=0.1)
+        denoised = (np.clip(denoised, 0, 1) * 255.).astype(np.uint8)
+        axes[i].imshow(denoised,cmap='gray')
+        axes[i].axis('off')
+        param_text = f"K: {k[i]}, w: {w[i]}\n"
+        axes[i].text(0.5, -0.15, param_text, ha='center', va='top', transform=axes[i].transAxes, fontsize=10)
+        imageio.imsave(f'./model_test/img{i}.png', denoised)
+    fig.savefig('model_res.png')
 
 if __name__ == "__main__":
     do_training = False
@@ -189,31 +205,32 @@ if __name__ == "__main__":
     use_toy_data = False
     # Parameters for the GMM: Components and window size, m = w ** 2
     # Use K = 2 for toy/debug model
-    K = 10
+    K = 15
     w = 5
-    
-    if do_training:
-        train(use_toy_data, K, w)
-    else:
-        # fig, axes = plt.subplots(5, 3, figsize=(10, 15))  # 5 rows, 3 columns
-        # axes[0, 0].set_title('Noisy')
-        # axes[0, 1].set_title('Denoised')
-        # axes[0, 2].set_title('Ground Truth')
-        for i in range(1, 6):
-            denoised = denoise(i, K, w, test=False,sigma=0.05)
-            # x, y = utils.validation_data(i, sigma=0.1, seed=1, w=w)
-            # noisy = utils.patches_to_image(y, x.shape, w)
-            # axes[i-1,0].imshow(noisy,cmap='gray')
-            # axes[i-1,1].imshow(denoised,cmap='gray')
-            # axes[i-1,2].imshow(x,cmap='gray')
+    #models_test()
+    benchmark(K, w)
+    # if do_training:
+    #     train(use_toy_data, K, w)
+    # else:
+    #     # fig, axes = plt.subplots(5, 3, figsize=(10, 15))  
+    #     # axes[0, 0].set_title('Noisy')
+    #     # axes[0, 1].set_title('Denoised')
+    #     # axes[0, 2].set_title('Ground Truth')
+    #     for i in range(1, 6):
+    #         denoised = denoise(i, K, w, test=False,sigma=0.1)
+    #         x, y = utils.validation_data(i, sigma=0.1, seed=1, w=w)
+    #         noisy = utils.patches_to_image(y, x.shape, w)
+    #         # axes[i-1,0].imshow(noisy,cmap='gray')
+    #         # axes[i-1,1].imshow(denoised,cmap='gray')
+    #         # axes[i-1,2].imshow(x,cmap='gray')
 
-            utils.imsave(f'./validation/img{i}_out_005.png', denoised)
-        # for ax_row in axes:
-        #     for ax in ax_row:
-        #         ax.axis('off')
-        # plt.tight_layout()
-        # plt.savefig("validation_0.1.png")
-        
-    # If you want to participate in the challenge, you can benchmark your model
-    # Remember to upload the images in the submission.
-    #benchmark(K, w)
+    #         utils.imsave(f'./validation/img{i}_out.png', denoised)
+    #     # for ax_row in axes:
+    #     #     for ax in ax_row:
+    #     #         ax.axis('off')
+    #     # plt.tight_layout()
+    #     # plt.savefig("validation_0.1.png")
+
+    # # If you want to participate in the challenge, you can benchmark your model
+    # # Remember to upload the images in the submission.
+    # benchmark(K, w)
